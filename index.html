@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataLeopard Repo Review Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Left Panel: Repo Navigation & Changes -->
+        <div id="left-panel">
+            <header>
+                <h1>Repo Review</h1>
+                <div id="repo-counter">0 / 0 reviewed</div>
+            </header>
+
+            <!-- Repo List -->
+            <nav id="repo-list">
+                <div class="loading">Loading repos...</div>
+            </nav>
+
+            <!-- Active Repo Detail -->
+            <div id="repo-detail" class="hidden">
+                <div id="repo-header">
+                    <h2 id="repo-name"></h2>
+                    <p id="repo-desc"></p>
+                    <div id="repo-links">
+                        <a id="link-github" href="#" target="_blank">GitHub</a>
+                        <a id="link-code" href="#" target="_blank">Browse Code</a>
+                        <a id="link-commits" href="#" target="_blank">Commit History</a>
+                    </div>
+                </div>
+
+                <!-- Recent Changes -->
+                <div id="changes-section">
+                    <h3>Recent Changes</h3>
+                    <div id="commits-list"></div>
+                </div>
+
+                <!-- Review Checklist -->
+                <div id="checklist-section">
+                    <h3>Review Checklist</h3>
+                    <div id="checklist"></div>
+                </div>
+
+                <!-- Notes -->
+                <div id="notes-section">
+                    <h3>Notes</h3>
+                    <textarea id="repo-notes" placeholder="Type your review notes here..."></textarea>
+                    <button id="save-notes">Save Notes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resize Handle -->
+        <div id="resize-handle"></div>
+
+        <!-- Right Panel: Code Preview / Rendered View -->
+        <div id="right-panel">
+            <div id="right-toolbar">
+                <select id="view-mode">
+                    <option value="readme">README Preview</option>
+                    <option value="github">GitHub Repo</option>
+                    <option value="diff">Recent Diff</option>
+                    <option value="files">File Browser</option>
+                </select>
+                <div id="nav-buttons">
+                    <button id="prev-repo" title="Previous repo (←)">← Prev</button>
+                    <button id="next-repo" title="Next repo (→)">Next →</button>
+                    <button id="mark-reviewed" title="Mark as reviewed (R)">✓ Mark Reviewed</button>
+                </div>
+            </div>
+            <div id="right-content">
+                <div id="welcome-screen">
+                    <h2>Select a repo to begin review</h2>
+                    <p>Use the list on the left, or press <kbd>↑</kbd> <kbd>↓</kbd> to navigate.</p>
+                    <p>Press <kbd>R</kbd> to mark a repo as reviewed.</p>
+                    <p>Press <kbd>←</kbd> <kbd>→</kbd> to switch repos.</p>
+                </div>
+                <iframe id="preview-frame" class="hidden"></iframe>
+                <div id="readme-render" class="hidden"></div>
+                <div id="diff-render" class="hidden"></div>
+                <div id="file-browser" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

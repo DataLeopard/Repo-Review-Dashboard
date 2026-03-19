@@ -3,18 +3,14 @@ const ORG = 'DataLeopard';
 const API = 'https://api.github.com';
 const STORE = 'repo-review-v2';
 
-// Known deployed URLs — GitHub Pages or other hosting
-// These get auto-detected too, but hardcoding known ones ensures instant load
 const KNOWN_URLS = {
     'georgetowntrails': 'https://dataleopard.github.io/georgetowntrails/',
     'austin-locator': 'https://dataleopard.github.io/austin-locator/',
     'guestcard-dashboard': 'https://dataleopard.github.io/guestcard-dashboard/',
     'guestcard-chat': 'https://dataleopard.github.io/guestcard-chat/',
     'apartment-locator': 'https://dataleopard.github.io/apartment-locator/',
-    'Repo-Review-Dashboard': 'https://dataleopard.github.io/Repo-Review-Dashboard/',
 };
 
-// For repos without a live site, detect main entry file to show code
 const ENTRY_FILES = [
     'app.py', 'main.py', 'agent.py', '__main__.py',
     'src/App.jsx', 'src/App.tsx', 'src/App.js',
@@ -33,13 +29,14 @@ const EXT_LANG = {
 let repos = [];
 let activeTab = -1;
 let state = loadState();
-let repoData = {}; // per-repo: { liveUrl, files, changedFiles, commits, fileIndex, loaded }
+let repoData = {};
+let openedWindows = {}; // track opened live site windows
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
     setupKeyboard();
     setupFeedbackButtons();
-    setupViewToggle();
+    setupButtons();
     await loadAllRepos();
 });
 
@@ -68,7 +65,6 @@ async function loadAllRepos() {
         document.getElementById('view-label').textContent = `Error: ${e.message}`;
         return;
     }
-
     buildTabs();
     updateProgress();
     switchTab(0);
@@ -102,7 +98,6 @@ function getLiveUrl(repo) {
 async function preloadAll() {
     for (let i = 0; i < repos.length; i++) {
         if (!repoData[i]) await loadRepoData(i);
-        // Update tab with change badge
         const rd = repoData[i];
         if (rd?.changedFiles?.size > 0) {
             const tab = document.querySelector(`.tab[data-index="${i}"]`);
@@ -114,38 +109,28 @@ async function preloadAll() {
             }
         }
     }
-    document.getElementById('progress-text').textContent =
-        `${repos.filter((_,i) => repoData[i]?.loaded).length} repos loaded`;
+    document.getElementById('progress-text').textContent = `${repos.length} repos loaded`;
 }
 
 async function loadRepoData(index) {
     const repo = repos[index];
     if (repoData[index]) return repoData[index];
-
     try {
         const [tree, commits] = await Promise.all([
             api(`/repos/${ORG}/${repo.name}/git/trees/${repo.default_branch}?recursive=1`),
             api(`/repos/${ORG}/${repo.name}/commits?per_page=5`),
         ]);
-
         const files = tree.tree.filter(f => f.type === 'blob').sort((a, b) => a.path.localeCompare(b.path));
-
         const changedFiles = new Map();
         for (const c of commits.slice(0, 3)) {
             try {
                 const d = await api(`/repos/${ORG}/${repo.name}/commits/${c.sha}`);
                 for (const f of d.files) {
-                    if (!changedFiles.has(f.filename)) {
-                        changedFiles.set(f.filename, {
-                            status: f.status, additions: f.additions, deletions: f.deletions,
-                            msg: d.commit.message.split('\n')[0], sha: c.sha.slice(0, 7),
-                        });
-                    }
+                    if (!changedFiles.has(f.filename))
+                        changedFiles.set(f.filename, { status: f.status, additions: f.additions, deletions: f.deletions, msg: d.commit.message.split('\n')[0] });
                 }
             } catch {}
         }
-
-        // Find entry file
         let entryIdx = 0;
         for (const ef of ENTRY_FILES) {
             const idx = files.findIndex(f => f.path === ef);
@@ -155,21 +140,10 @@ async function loadRepoData(index) {
             const src = files.findIndex(f => /\.(py|js|jsx|ts|tsx|html)$/.test(f.path) && !f.path.includes('config'));
             if (src >= 0) entryIdx = src;
         }
-
-        // Check for live URL via GitHub Pages API
-        let liveUrl = getLiveUrl(repo);
-        if (!liveUrl && repo.has_pages) {
-            try {
-                const pages = await api(`/repos/${ORG}/${repo.name}/pages`);
-                if (pages.html_url) liveUrl = pages.html_url;
-            } catch {}
-        }
-
-        repoData[index] = { liveUrl, files, changedFiles, changedSet: new Set(changedFiles.keys()), commits, fileIndex: entryIdx, loaded: true };
+        repoData[index] = { files, changedFiles, changedSet: new Set(changedFiles.keys()), commits, fileIndex: entryIdx, loaded: true };
     } catch {
-        repoData[index] = { liveUrl: getLiveUrl(repo), files: [], changedFiles: new Map(), changedSet: new Set(), commits: [], fileIndex: 0, loaded: false };
+        repoData[index] = { files: [], changedFiles: new Map(), changedSet: new Set(), commits: [], fileIndex: 0, loaded: false };
     }
-
     return repoData[index];
 }
 
@@ -179,82 +153,64 @@ async function switchTab(index) {
     activeTab = index;
     const repo = repos[index];
 
-    // Highlight tab
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
     document.querySelector(`.tab[data-index="${index}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
     const rd = await loadRepoData(index);
-
-    // Render sidebar
     renderSidebar(repo, rd);
     renderFeedback(repo);
 
-    // Show live site or code
-    const liveUrl = rd.liveUrl;
-    const viewToggle = document.getElementById('view-toggle');
-    const viewLabel = document.getElementById('view-label');
+    const liveUrl = getLiveUrl(repo);
+    const livePanel = document.getElementById('live-panel');
+    const codeArea = document.getElementById('code-area');
+    const btnLive = document.getElementById('btn-open-live');
 
     if (liveUrl) {
-        viewToggle.classList.remove('hidden');
-        viewToggle.textContent = 'Code';
-        viewToggle.dataset.mode = 'live';
-        viewLabel.textContent = liveUrl;
-        showLive(liveUrl);
+        // Show live panel + code below
+        livePanel.classList.remove('hidden');
+        codeArea.classList.remove('hidden');
+        document.getElementById('live-url-display').textContent = liveUrl;
+        document.getElementById('live-launch-btn').onclick = () => openLiveSite(repo.name, liveUrl);
+        btnLive.classList.remove('hidden');
+        btnLive.onclick = () => openLiveSite(repo.name, liveUrl);
+        document.getElementById('view-label').textContent = `${repo.name} — has live site`;
     } else {
-        viewToggle.classList.remove('hidden');
-        viewToggle.textContent = 'No live site — showing code';
-        viewToggle.dataset.mode = 'code';
-        viewToggle.classList.add('hidden');
-        viewLabel.textContent = `${repo.name} — code view`;
-        showCode(rd);
+        livePanel.classList.add('hidden');
+        codeArea.classList.remove('hidden');
+        btnLive.classList.add('hidden');
+        document.getElementById('view-label').textContent = `${repo.name} — code only`;
     }
-}
 
-// ── Show Live Site ──
-function showLive(url) {
-    const frame = document.getElementById('live-frame');
-    const codeArea = document.getElementById('code-area');
-    frame.classList.remove('hidden');
-    codeArea.classList.add('hidden');
-    frame.src = url;
-}
-
-// ── Show Code ──
-function showCode(rd) {
-    const frame = document.getElementById('live-frame');
-    const codeArea = document.getElementById('code-area');
-    frame.classList.add('hidden');
-    codeArea.classList.remove('hidden');
+    document.getElementById('btn-github').onclick = () => window.open(repo.html_url, '_blank');
     openFile(rd.fileIndex);
 }
 
-// ── View Toggle ──
-function setupViewToggle() {
-    const btn = document.getElementById('view-toggle');
-    btn.addEventListener('click', () => {
-        const rd = repoData[activeTab];
-        if (!rd) return;
-        if (btn.dataset.mode === 'live') {
-            btn.dataset.mode = 'code';
-            btn.textContent = 'Live Site';
-            document.getElementById('view-label').textContent = `${repos[activeTab].name} — code view`;
-            showCode(rd);
-        } else {
-            btn.dataset.mode = 'live';
-            btn.textContent = 'Code';
-            document.getElementById('view-label').textContent = rd.liveUrl;
-            showLive(rd.liveUrl);
-        }
-    });
+// ── Open Live Site ──
+function openLiveSite(name, url) {
+    // Reuse window if still open
+    if (openedWindows[name] && !openedWindows[name].closed) {
+        openedWindows[name].focus();
+        return;
+    }
+    openedWindows[name] = window.open(url, `live-${name}`);
+    toast('Opened ' + name, 'info');
+}
+
+function openAllLiveSites() {
+    for (const repo of repos) {
+        const url = getLiveUrl(repo);
+        if (url) openLiveSite(repo.name, url);
+    }
+    toast(`Opened ${Object.keys(KNOWN_URLS).length} live sites`, 'info');
 }
 
 // ── Sidebar ──
 function renderSidebar(repo, rd) {
-    // Summary
     const sum = document.getElementById('repo-summary');
     const lastCommit = rd.commits[0];
     const lastMsg = lastCommit ? lastCommit.commit.message.split('\n')[0] : '—';
     const lastDate = lastCommit ? timeSince(lastCommit.commit.author.date) : '—';
+    const liveUrl = getLiveUrl(repo);
     sum.innerHTML = `
         <div class="stat"><span>Files</span><span>${rd.files.length}</span></div>
         <div class="stat"><span>Changed</span><span class="${rd.changedFiles.size > 0 ? 'hot' : ''}">${rd.changedFiles.size}</span></div>
@@ -264,11 +220,10 @@ function renderSidebar(repo, rd) {
         <div class="repo-links">
             <a href="${repo.html_url}" target="_blank">GitHub</a>
             <a href="${repo.html_url}/commits/${repo.default_branch}" target="_blank">Commits</a>
-            ${rd.liveUrl ? `<a href="${rd.liveUrl}" target="_blank">Live</a>` : ''}
+            ${liveUrl ? `<a href="${liveUrl}" target="_blank">Live Site</a>` : ''}
         </div>
     `;
 
-    // Changes
     const cl = document.getElementById('change-list');
     if (rd.changedFiles.size === 0) {
         cl.innerHTML = '<div class="empty">No recent changes</div>';
@@ -281,18 +236,12 @@ function renderSidebar(repo, rd) {
             div.innerHTML = `<span class="cbadge ${badge}">${badge}</span><span title="${esc(fn)}">${esc(fn)}</span>`;
             div.addEventListener('click', () => {
                 const idx = rd.files.findIndex(f => f.path === fn);
-                if (idx >= 0) {
-                    // Switch to code view and open file
-                    const btn = document.getElementById('view-toggle');
-                    if (btn.dataset.mode === 'live') btn.click();
-                    openFile(idx);
-                }
+                if (idx >= 0) openFile(idx);
             });
             cl.appendChild(div);
         }
     }
 
-    // File list
     const fl = document.getElementById('file-list');
     fl.innerHTML = '';
     const dirs = new Set();
@@ -314,16 +263,12 @@ function renderSidebar(repo, rd) {
         div.style.paddingLeft = (4 + (parts.length - 1) * 10) + 'px';
         div.dataset.index = i;
         div.textContent = parts[parts.length - 1];
-        div.addEventListener('click', () => {
-            const btn = document.getElementById('view-toggle');
-            if (btn.dataset.mode === 'live') btn.click();
-            openFile(i);
-        });
+        div.addEventListener('click', () => openFile(i));
         fl.appendChild(div);
     });
 }
 
-// ── Open File (code view) ──
+// ── Open File ──
 async function openFile(index) {
     const rd = repoData[activeTab];
     if (!rd || index < 0 || index >= rd.files.length) return;
@@ -332,10 +277,11 @@ async function openFile(index) {
     const repo = repos[activeTab];
     const ext = file.path.split('.').pop().toLowerCase();
 
-    // Highlight
     document.querySelectorAll('#file-list .fitem:not(.dir)').forEach(el => {
         el.classList.toggle('active', el.dataset.index == index);
     });
+    const activeEl = document.querySelector(`#file-list .fitem[data-index="${index}"]`);
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
 
     document.getElementById('view-label').textContent = `${repo.name} / ${file.path}`;
 
@@ -352,14 +298,17 @@ async function openFile(index) {
         codeEl.textContent = content;
         try { hljs.highlightElement(codeEl); } catch {}
 
-        // Add line numbers
         const lines = codeEl.innerHTML.split('\n');
         codeEl.innerHTML = lines.map((l, i) => `<span class="ln">${i + 1}</span>${l}`).join('\n');
-
         document.getElementById('code-area').scrollTop = 0;
     } catch (e) {
         codeEl.textContent = `Error: ${e.message}`;
     }
+}
+
+// ── Buttons ──
+function setupButtons() {
+    document.getElementById('open-all-live').addEventListener('click', openAllLiveSites);
 }
 
 // ── Feedback ──
@@ -379,7 +328,7 @@ function setupFeedbackButtons() {
             updateProgress();
             toast(st === 'good' ? 'Looks good!' : st === 'needs-work' ? 'Flagged' : 'Skipped', st);
 
-            // Auto-advance
+            // Auto-advance to next unreviewed
             setTimeout(() => {
                 const next = repos.findIndex((r, i) => i > activeTab && !state.statuses?.[r.name]);
                 if (next >= 0) switchTab(next);
@@ -419,27 +368,26 @@ function setupKeyboard() {
                 e.preventDefault(); switchTab(Math.min(activeTab + 1, repos.length - 1)); break;
             case 'ArrowUp': case 'k':
                 e.preventDefault();
-                if (rd && rd.fileIndex > 0) { ensureCodeView(); openFile(rd.fileIndex - 1); }
+                if (rd && rd.fileIndex > 0) openFile(rd.fileIndex - 1);
                 break;
             case 'ArrowDown': case 'j':
                 e.preventDefault();
-                if (rd && rd.fileIndex < rd.files.length - 1) { ensureCodeView(); openFile(rd.fileIndex + 1); }
+                if (rd && rd.fileIndex < rd.files.length - 1) openFile(rd.fileIndex + 1);
                 break;
             case '1': e.preventDefault(); document.querySelector('.sbtn[data-status="good"]').click(); break;
             case '2': e.preventDefault(); document.querySelector('.sbtn[data-status="needs-work"]').click(); break;
             case '3': e.preventDefault(); document.querySelector('.sbtn[data-status="skip"]').click(); break;
-            case 'l': case 'L':
+            case 'o': case 'O':
                 e.preventDefault();
-                const btn = document.getElementById('view-toggle');
-                if (!btn.classList.contains('hidden')) btn.click();
+                const url = getLiveUrl(repos[activeTab]);
+                if (url) openLiveSite(repos[activeTab].name, url);
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (rd) window.open(`${repos[activeTab].html_url}/blob/${repos[activeTab].default_branch}/${rd.files[rd.fileIndex]?.path}`, '_blank');
                 break;
         }
     });
-}
-
-function ensureCodeView() {
-    const btn = document.getElementById('view-toggle');
-    if (btn.dataset.mode === 'live') btn.click();
 }
 
 // ── Progress ──

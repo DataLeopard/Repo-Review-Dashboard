@@ -11,7 +11,10 @@
     <!-- Tab Bar -->
     <div id="tab-bar">
         <div id="tabs"></div>
-        <div id="progress"><span id="progress-text">Loading...</span></div>
+        <div id="progress">
+            <button id="open-all-live" title="Open all live sites in new tabs">Open All Live</button>
+            <span id="progress-text">Loading...</span>
+        </div>
     </div>
 
     <!-- Main -->
@@ -46,11 +49,18 @@
             <div id="content-toolbar">
                 <span id="view-label">Loading repos...</span>
                 <div id="toolbar-right">
-                    <button id="view-toggle" class="hidden">Code</button>
+                    <button id="btn-open-live" class="hidden">Open Live Site</button>
+                    <button id="btn-github">GitHub</button>
                 </div>
             </div>
-            <!-- Live site iframe -->
-            <iframe id="live-frame" class="hidden" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+            <!-- Live site launch panel (shown for repos with deployed sites) -->
+            <div id="live-panel" class="hidden">
+                <div id="live-inner">
+                    <div id="live-url-display"></div>
+                    <button id="live-launch-btn">Open Live Site in New Tab</button>
+                    <p id="live-hint">GitHub Pages blocks iframe embedding.<br>Click above to view the rendered app, or browse files below.</p>
+                </div>
+            </div>
             <!-- Code viewer -->
             <div id="code-area" class="hidden">
                 <pre><code id="code-content"></code></pre>

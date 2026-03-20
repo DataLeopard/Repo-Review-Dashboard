@@ -8,62 +8,104 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Tab Bar -->
-    <div id="tab-bar">
-        <div id="tabs"></div>
-        <div id="progress">
-            <button id="open-all-live" title="Open all live sites in new tabs">Open All Live</button>
-            <span id="progress-text">Loading...</span>
+
+    <!-- ═══ TOP BAR ═══ -->
+    <header id="topbar">
+        <div id="topbar-left">
+            <button id="btn-home" class="top-btn" title="Back to dashboard">
+                <span class="icon">&#9776;</span> Repo Review
+            </button>
+            <span id="review-count">Loading...</span>
+        </div>
+        <div id="topbar-right">
+            <button id="btn-open-all" class="action-btn green">Open All Live Sites</button>
+            <button id="btn-ai-overview" class="action-btn blue">AI Overview — All Repos</button>
+        </div>
+    </header>
+
+    <!-- ═══ LANDING: BIG CARD GRID ═══ -->
+    <div id="landing">
+        <div id="landing-header">
+            <h1>Your Repos</h1>
+            <p>Click any app to review. Hit <strong>AI Summary</strong> for a quick rundown of recent work.</p>
+        </div>
+        <div id="card-grid"></div>
+    </div>
+
+    <!-- ═══ AI SUMMARY MODAL ═══ -->
+    <div id="ai-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="ai-modal-title">AI Review Summary</h2>
+                <button id="ai-modal-close" class="modal-close">&times;</button>
+            </div>
+            <div id="ai-modal-body"></div>
+            <div class="modal-footer">
+                <button id="ai-copy-claude" class="action-btn blue">Copy Prompt for Claude Code</button>
+                <button id="ai-modal-done" class="action-btn muted">Close</button>
+            </div>
         </div>
     </div>
 
-    <!-- Main -->
-    <div id="main">
-        <!-- Sidebar -->
-        <div id="sidebar">
-            <div id="objectives">
-                <h3>Quick Review</h3>
-                <div id="repo-summary"></div>
+    <!-- ═══ REPO DETAIL VIEW ═══ -->
+    <div id="detail-view" class="hidden">
+        <div id="detail-topbar">
+            <button id="btn-back" class="top-btn">&larr; Back to Dashboard</button>
+            <div id="detail-nav">
+                <button id="btn-prev" class="nav-btn">&larr; Prev</button>
+                <span id="detail-repo-name"></span>
+                <button id="btn-next" class="nav-btn">Next &rarr;</button>
             </div>
-            <div id="changes">
-                <h3>What Changed</h3>
-                <div id="change-list"></div>
-            </div>
-            <div id="file-nav">
-                <h3>Files</h3>
-                <div id="file-list"></div>
-            </div>
-            <div id="feedback">
-                <h3>Verdict</h3>
-                <div id="verdict-btns">
-                    <button class="sbtn good" data-status="good">Good</button>
-                    <button class="sbtn needs-work" data-status="needs-work">Needs Work</button>
-                    <button class="sbtn skip" data-status="skip">Skip</button>
-                </div>
-                <textarea id="quick-note" placeholder="Quick note (auto-saves)..."></textarea>
+            <div id="detail-actions">
+                <button id="detail-live" class="action-btn green hidden">Open Live Site</button>
+                <button id="detail-github" class="action-btn muted">GitHub</button>
+                <button id="detail-ai" class="action-btn blue">AI Summary</button>
             </div>
         </div>
 
-        <!-- Content -->
-        <div id="content">
-            <div id="content-toolbar">
-                <span id="view-label">Loading repos...</span>
-                <div id="toolbar-right">
-                    <button id="btn-open-live" class="hidden">Open Live Site</button>
-                    <button id="btn-github">GitHub</button>
+        <div id="detail-main">
+            <!-- Sidebar -->
+            <div id="sidebar">
+                <div id="objectives">
+                    <h3>Quick Review</h3>
+                    <div id="repo-summary"></div>
+                </div>
+                <div id="changes">
+                    <h3>What Changed</h3>
+                    <div id="change-list"></div>
+                </div>
+                <div id="file-nav">
+                    <h3>Files</h3>
+                    <div id="file-list"></div>
+                </div>
+                <div id="feedback">
+                    <h3>Your Verdict</h3>
+                    <div id="verdict-btns">
+                        <button class="verdict-btn good" data-status="good">
+                            <span class="verdict-icon">&#10003;</span>
+                            Looks Good
+                        </button>
+                        <button class="verdict-btn needs-work" data-status="needs-work">
+                            <span class="verdict-icon">&#9888;</span>
+                            Needs Work
+                        </button>
+                        <button class="verdict-btn skip" data-status="skip">
+                            <span class="verdict-icon">&#8594;</span>
+                            Skip
+                        </button>
+                    </div>
+                    <textarea id="quick-note" placeholder="Quick note (auto-saves)..."></textarea>
                 </div>
             </div>
-            <!-- Live site launch panel (shown for repos with deployed sites) -->
-            <div id="live-panel" class="hidden">
-                <div id="live-inner">
-                    <div id="live-url-display"></div>
-                    <button id="live-launch-btn">Open Live Site in New Tab</button>
-                    <p id="live-hint">GitHub Pages blocks iframe embedding.<br>Click above to view the rendered app, or browse files below.</p>
+
+            <!-- Content -->
+            <div id="content">
+                <div id="content-toolbar">
+                    <span id="view-label">Select a file...</span>
                 </div>
-            </div>
-            <!-- Code viewer -->
-            <div id="code-area" class="hidden">
-                <pre><code id="code-content"></code></pre>
+                <div id="code-area">
+                    <pre><code id="code-content"></code></pre>
+                </div>
             </div>
         </div>
     </div>

@@ -91,6 +91,56 @@ body {
 
 .action-btn.small { padding: 6px 14px; font-size: 12px; }
 
+/* ── AI Toggle Switch ── */
+#ai-toggle-wrap { display: flex; align-items: center; }
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-label input { display: none; }
+
+.toggle-slider {
+    width: 40px;
+    height: 22px;
+    background: var(--border);
+    border-radius: 11px;
+    position: relative;
+    transition: background 0.2s;
+}
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: var(--muted);
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.2s;
+}
+
+.toggle-label input:checked + .toggle-slider {
+    background: var(--blue);
+}
+.toggle-label input:checked + .toggle-slider::after {
+    left: 20px;
+    background: white;
+}
+
+.toggle-text {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+}
+.toggle-label input:checked ~ .toggle-text {
+    color: var(--blue);
+}
+
 /* ══════════════════════ LANDING PAGE ══════════════════════ */
 #landing {
     flex: 1;

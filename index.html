@@ -19,7 +19,15 @@
         </div>
         <div id="topbar-right">
             <button id="btn-open-all" class="action-btn green">Open All Live Sites</button>
-            <button id="btn-ai-overview" class="action-btn blue">AI Overview — All Repos</button>
+            <div id="ai-toggle-wrap">
+                <label class="toggle-label" for="ai-toggle">
+                    <input type="checkbox" id="ai-toggle">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-text">AI Features</span>
+                </label>
+            </div>
+            <button id="btn-ai-overview" class="action-btn blue" disabled title="Turn on AI toggle first">AI Overview</button>
+            <button id="btn-set-token" class="action-btn muted small" title="Set GitHub token for higher API limits">Token</button>
         </div>
     </header>
 

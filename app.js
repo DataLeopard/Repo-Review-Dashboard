@@ -32,6 +32,7 @@ let activeTab = -1;
 let state = loadState();
 let repoData = {};
 let currentView = 'landing'; // 'landing' or 'detail'
+let aiEnabled = state.aiEnabled || false; // AI features OFF by default
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
@@ -113,11 +114,17 @@ function buildCards() {
         btn.addEventListener('click', (e) => { e.stopPropagation(); window.open(btn.dataset.url, '_blank'); });
     });
     grid.querySelectorAll('.card-btn.ai-summary').forEach(btn => {
-        btn.addEventListener('click', (e) => { e.stopPropagation(); showAISummary(+btn.dataset.index); });
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!aiEnabled) { toast('Turn on AI toggle first', 'info'); return; }
+            showAISummary(+btn.dataset.index);
+        });
     });
     grid.querySelectorAll('.card-btn.github-link').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); window.open(btn.dataset.url, '_blank'); });
     });
+
+    updateAIButtonStates();
 }
 
 // ── Preload commit data for cards ──
@@ -189,7 +196,10 @@ async function loadDetail(index) {
         liveBtn.classList.add('hidden');
     }
     document.getElementById('detail-github').onclick = () => window.open(repo.html_url, '_blank');
-    document.getElementById('detail-ai').onclick = () => showAISummary(index);
+    document.getElementById('detail-ai').onclick = () => {
+        if (!aiEnabled) { toast('Turn on AI toggle first', 'info'); return; }
+        showAISummary(index);
+    };
 
     const rd = await loadRepoData(index);
     renderSidebar(repo, rd);
@@ -514,7 +524,34 @@ function setupTopButtons() {
         }
         toast(`Opened ${Object.keys(KNOWN_URLS).length} live sites`, 'info');
     });
-    document.getElementById('btn-ai-overview').addEventListener('click', showAllReposSummary);
+
+    // AI Toggle
+    const aiToggle = document.getElementById('ai-toggle');
+    aiToggle.checked = aiEnabled;
+    updateAIButtonStates();
+    aiToggle.addEventListener('change', () => {
+        aiEnabled = aiToggle.checked;
+        state.aiEnabled = aiEnabled;
+        save();
+        updateAIButtonStates();
+        toast(aiEnabled ? 'AI features ON' : 'AI features OFF', 'info');
+    });
+
+    document.getElementById('btn-ai-overview').addEventListener('click', () => {
+        if (!aiEnabled) { toast('Turn on AI toggle first', 'info'); return; }
+        showAllReposSummary();
+    });
+
+    // Token button
+    document.getElementById('btn-set-token').addEventListener('click', () => {
+        const t = prompt('Enter GitHub personal access token (repo scope):\nhttps://github.com/settings/tokens\n\nLeave empty to clear token.');
+        if (t !== null) {
+            state.token = t || '';
+            save();
+            toast(t ? 'Token saved! Reload to use.' : 'Token cleared.', 'info');
+        }
+    });
+
     document.getElementById('btn-back').addEventListener('click', showLanding);
     document.getElementById('btn-prev').addEventListener('click', () => {
         if (activeTab > 0) loadDetail(activeTab - 1);
@@ -577,6 +614,26 @@ function setupModal() {
 
 function closeModal() {
     document.getElementById('ai-modal').classList.add('hidden');
+}
+
+function updateAIButtonStates() {
+    const overviewBtn = document.getElementById('btn-ai-overview');
+    overviewBtn.disabled = !aiEnabled;
+    overviewBtn.title = aiEnabled ? 'Show AI overview of all repos' : 'Turn on AI toggle first';
+    overviewBtn.style.opacity = aiEnabled ? '1' : '0.4';
+
+    const detailAI = document.getElementById('detail-ai');
+    if (detailAI) {
+        detailAI.disabled = !aiEnabled;
+        detailAI.style.opacity = aiEnabled ? '1' : '0.4';
+    }
+
+    // Update card AI buttons
+    document.querySelectorAll('.card-btn.ai-summary').forEach(btn => {
+        btn.disabled = !aiEnabled;
+        btn.style.opacity = aiEnabled ? '1' : '0.4';
+        btn.title = aiEnabled ? 'Show AI summary' : 'Turn on AI toggle first';
+    });
 }
 
 // ══════════════════════ KEYBOARD ══════════════════════
